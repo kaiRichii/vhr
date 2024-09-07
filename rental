@@ -1,0 +1,87 @@
+<?php
+session_start();
+include('database.php');
+
+if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== "vehicle_owner") {
+    header("Location: index.php");
+    exit();
+}
+
+$owner_id = $_SESSION["user_id"];
+
+// Fetch rental history for the owner
+$sql = "SELECT b.id, b.start_date, b.end_date, b.status, v.model, v.type, v.price, r.username AS renter_name
+        FROM bookings b
+        JOIN vehicles v ON b.vehicle_id = v.id
+        JOIN users r ON b.renter_id = r.id
+        WHERE v.owner_id = ?
+        ORDER BY b.start_date DESC";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $owner_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if (!$result) {
+    $_SESSION["error_message"] = "Error fetching rental history: " . mysqli_error($conn);
+    header("Location: requests.php");
+    exit();
+}
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rental History</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Rental History</h1>
+        <p>Welcome, <?php echo $_SESSION["username"]; ?>!</p>
+        <?php if (isset($_SESSION["success_message"])) : ?>
+            <div class="alert alert-success" role="alert">
+                <?php echo $_SESSION["success_message"]; ?>
+            </div>
+            <?php unset($_SESSION["success_message"]); ?>
+        <?php endif; ?>
+        <?php if (isset($_SESSION["error_message"])) : ?>
+            <div class="alert alert-danger" role="alert">
+                <?php echo $_SESSION["error_message"]; ?>
+            </div>
+            <?php unset($_SESSION["error_message"]); ?>
+        <?php endif; ?>
+        <div id="table-content">
+            <table class="table table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Booking ID</th>
+                        <th>Vehicle</th>
+                        <th>Renter</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($row = $result->fetch_assoc()) : ?>
+                        <tr>
+                            <td><?php echo $row["id"]; ?></td>
+                            <td><?php echo $row["model"] . " (" . $row["type"] . ")"; ?></td>
+                            <td><?php echo $row["renter_name"]; ?></td>
+                            <td><?php echo $row["start_date"]; ?></td>
+                            <td><?php echo $row["end_date"]; ?></td>
+                            <td><?php echo $row["price"]; ?></td>
+                            <td><?php echo $row["status"]; ?></td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
